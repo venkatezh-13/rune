@@ -179,9 +179,17 @@ impl<'m> Instance<'m> {
         
         // Capture result BEFORE manipulating stack if this is a block with result
         let result = if !is_loop {
-            if let Some(ty) = frame.result_type {
-                // The top of stack should be the result value
-                Some(stack.last().ok_or(Trap::TypeMismatch)?.clone())
+            if let Some(expected_ty) = frame.result_type {
+                // POP the result value (don't just clone it!)
+                let val = stack.pop().ok_or(Trap::TypeMismatch)?;
+                // Verify the value matches expected type
+                match (expected_ty, &val) {
+                    (ValType::I32, Val::I32(_)) => Ok(Some(val)),
+                    (ValType::I64, Val::I64(_)) => Ok(Some(val)),
+                    (ValType::F32, Val::F32(_)) => Ok(Some(val)),
+                    (ValType::F64, Val::F64(_)) => Ok(Some(val)),
+                    _ => Err(Trap::TypeMismatch),
+                }?
             } else {
                 None
             }
@@ -189,8 +197,10 @@ impl<'m> Instance<'m> {
             None
         };
         
-        // Pop control frames
-        for _ in 0..=depth { ctrl.pop(); }
+        // Pop control frames (including the target frame)
+        for _ in 0..=depth { 
+            ctrl.pop(); 
+        }
         
         // Restore stack to base
         stack.truncate(base);
@@ -498,8 +508,20 @@ impl<'m> Instance<'m> {
             }
         }
 
-        Ok(pf.result_type.and_then(|_| stack.pop()))
+        // At function return, the top of stack should be the return value
+match pf.result_type {
+    Some(expected_ty) => {
+        let val = stack.pop().ok_or(Trap::TypeMismatch)?;
+        // Verify the return value type
+        match (expected_ty, &val) {
+            (ValType::I32, Val::I32(_)) => Ok(Some(val)),
+            (ValType::I64, Val::I64(_)) => Ok(Some(val)),
+            (ValType::F32, Val::F32(_)) => Ok(Some(val)),
+            (ValType::F64, Val::F64(_)) => Ok(Some(val)),
+            _ => Err(Trap::TypeMismatch),
+        }
     }
+    None => Ok(None),
 }
 
 fn block_result(bt: &BlockType) -> Option<ValType> {
