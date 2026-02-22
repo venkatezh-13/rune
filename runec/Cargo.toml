@@ -1,0 +1,12 @@
+[package]
+name = "runec"
+version = "0.1.0"
+edition = "2021"
+description = "Rune compiler CLI"
+
+[[bin]]
+name = "runec"
+path = "src/main.rs"
+
+[dependencies]
+rune = { path = ".." }
