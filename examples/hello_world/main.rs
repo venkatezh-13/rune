@@ -30,7 +30,7 @@ fn main() {
             Op::I32Const(42),
             Op::CallHost(0),
             Op::Return,
-        ],
+        ].into(),  // Add .into() here
     });
     module.exports.push(("run".into(), 0));
 
