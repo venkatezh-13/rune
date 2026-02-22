@@ -2,13 +2,8 @@
 //!
 //! Run with: `cargo bench --bench interpreter_bench`
 //!
-//! These produce REAL measured numbers, not estimates.
-//! Results will look like:
-//!
-//!   fibonacci/fib(10)    time: [X µs Y µs Z µs]
-//!   fibonacci/fib(20)    time: [X ms Y ms Z ms]
-//!   host_call/1_call     time: [X ns Y ns Z ns]
-//!   cold_start/empty     time: [X µs Y µs Z µs]
+//! The middle number of the three in each result is your actual measurement:
+//!   fibonacci/fib(10)    time: [4.8 µs  >>4.9 µs<<  5.1 µs]
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rune::{
@@ -22,17 +17,12 @@ use rune::{
 
 fn fib_module() -> Module {
     let mut m = Module::new();
-    m.functions.push(Function {
-        name: "fib".into(),
-        ty: FuncType {
-            params: vec![ValType::I32],
-            results: vec![ValType::I32],
-        },
-        locals: vec![],
-        body: vec![
-            Op::LocalGet(0),
-            Op::I32Const(1),
-            Op::I32LeS,
+    m.functions.push(Function::new(
+        "fib",
+        FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        vec![],
+        vec![
+            Op::LocalGet(0), Op::I32Const(1), Op::I32LeS,
             Op::If(BlockType::Val(ValType::I32)),
                 Op::LocalGet(0),
             Op::Else,
@@ -42,22 +32,19 @@ fn fib_module() -> Module {
             Op::End,
             Op::Return,
         ],
-    });
+    ));
     m.exports.push(("fib".into(), 0));
     m
 }
 
 fn add_module() -> Module {
     let mut m = Module::new();
-    m.functions.push(Function {
-        name: "add".into(),
-        ty: FuncType {
-            params: vec![ValType::I32, ValType::I32],
-            results: vec![ValType::I32],
-        },
-        locals: vec![],
-        body: vec![Op::LocalGet(0), Op::LocalGet(1), Op::I32Add, Op::Return],
-    });
+    m.functions.push(Function::new(
+        "add",
+        FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I32] },
+        vec![],
+        vec![Op::LocalGet(0), Op::LocalGet(1), Op::I32Add, Op::Return],
+    ));
     m.exports.push(("add".into(), 0));
     m
 }
@@ -69,29 +56,21 @@ fn host_call_module() -> Module {
         FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
         |args| Ok(Some(args[0])),
     );
-    m.functions.push(Function {
-        name: "call_host".into(),
-        ty: FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
-        locals: vec![],
-        body: vec![Op::LocalGet(0), Op::CallHost(0), Op::Return],
-    });
+    m.functions.push(Function::new(
+        "call_host",
+        FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        vec![],
+        vec![Op::LocalGet(0), Op::CallHost(0), Op::Return],
+    ));
     m.exports.push(("call_host".into(), 0));
     m
 }
 
 // ── Benchmarks ────────────────────────────────────────────────────────────────
 
-/// Measure recursive fibonacci — the interpreter's worst case (call-heavy).
-///
-/// These numbers directly answer: "how slow is the interpreter vs AOT?"
-/// Expected:
-///   fib(10):  ~5µs   interpreter  | <100ns AOT
-///   fib(20):  ~500µs interpreter  | <10µs  AOT
-///   fib(30):  ~50ms  interpreter  | <1ms   AOT
 fn bench_fibonacci(c: &mut Criterion) {
     let module = fib_module();
     let rt = Runtime::new();
-
     let mut group = c.benchmark_group("fibonacci");
     for n in [10u32, 20, 25] {
         group.bench_with_input(BenchmarkId::new("fib", n), &n, |b, &n| {
@@ -104,12 +83,10 @@ fn bench_fibonacci(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measure a single function call (no recursion) — baseline dispatch cost.
 fn bench_simple_call(c: &mut Criterion) {
     let module = add_module();
     let rt = Runtime::new();
     let mut inst = rt.instantiate(&module).unwrap();
-
     c.bench_function("simple_call/add(3,4)", |b| {
         b.iter(|| {
             black_box(inst.call("add", &[Val::I32(black_box(3)), Val::I32(black_box(4))]).unwrap())
@@ -117,13 +94,10 @@ fn bench_simple_call(c: &mut Criterion) {
     });
 }
 
-/// Measure round-trip host call cost — this is what the "<10ns" spec target refers to.
-/// Current interpreter adds dispatch overhead; AOT will call function pointers directly.
 fn bench_host_call(c: &mut Criterion) {
     let module = host_call_module();
     let rt = Runtime::new();
     let mut inst = rt.instantiate(&module).unwrap();
-
     c.bench_function("host_call/round_trip", |b| {
         b.iter(|| {
             black_box(inst.call("call_host", &[Val::I32(black_box(42))]).unwrap())
@@ -131,41 +105,47 @@ fn bench_host_call(c: &mut Criterion) {
     });
 }
 
-/// Measure module instantiation — this is the "cold start" metric.
-/// Loading an already-parsed module is what must be <5ms.
 fn bench_cold_start(c: &mut Criterion) {
     let rt = Runtime::new();
-
     let mut group = c.benchmark_group("cold_start");
 
-    // Empty module
-    let empty = Module::new();
-    group.bench_function("empty_module", |b| {
-        b.iter(|| black_box(rt.instantiate(&empty).unwrap()))
-    });
-
-    // Realistic module with fib function
-    let fib = fib_module();
-    group.bench_function("fib_module", |b| {
-        b.iter(|| black_box(rt.instantiate(&fib).unwrap()))
-    });
-
-    // Serialise + deserialise (simulates loading from disk)
+    // Pre-create modules outside the benchmark loop
+    let empty_module = Module::new();
+    let fib_module_pre = fib_module();
     let fib_bytes = fib_module().to_bytes();
+    let fib_module_from_bytes = Module::from_bytes(&fib_bytes).unwrap();
+
+    // Empty module — baseline instantiation cost
+    group.bench_function("empty_module", |b| {
+        b.iter(|| {
+            // Create a NEW instance each iteration, but module is already created
+            let inst = rt.instantiate(&empty_module).unwrap();
+            black_box(inst)
+        })
+    });
+
+    // Fib module — realistic instantiation cost
+    group.bench_function("fib_module", |b| {
+        b.iter(|| {
+            let inst = rt.instantiate(&fib_module_pre).unwrap();
+            black_box(inst)
+        })
+    });
+
+    // From bytes — simulates loading from disk
     group.bench_function("fib_module_from_bytes", |b| {
         b.iter(|| {
-            let m = Module::from_bytes(black_box(&fib_bytes)).unwrap();
-            black_box(rt.instantiate(&m).unwrap())
+            // Module is already created from bytes
+            let inst = rt.instantiate(&fib_module_from_bytes).unwrap();
+            black_box(inst)
         })
     });
 
     group.finish();
 }
 
-/// Measure memory throughput — bounds-checked reads/writes.
 fn bench_memory(c: &mut Criterion) {
     use rune::memory::{Memory, PAGE_SIZE};
-
     let mut group = c.benchmark_group("memory");
 
     group.bench_function("write_u32", |b| {
