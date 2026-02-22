@@ -4,7 +4,7 @@
 //! and verifies the output. This exercises the full pipeline:
 //!   Module builder → Module::to_bytes → Module::from_bytes → Instance::call
 
-use std::sync::Arc;
+
 use rune::{
     ir::{BlockType, Function, Op},
     module::Module,
