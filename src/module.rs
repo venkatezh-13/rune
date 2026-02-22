@@ -7,7 +7,6 @@ use crate::{
     trap::{Result, Trap},
     types::{FuncType, Val, ValType},
 };
-use std::collections::HashMap;
 
 /// Magic bytes at the start of every .rune file.
 pub const MAGIC: [u8; 4] = *b"RUNE";
