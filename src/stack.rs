@@ -1,3 +1,4 @@
+#![allow(clippy::identity_op)]
 //! Stack management for Rune instances.
 //!
 //! The software value stack used by the interpreter lives in `instance.rs`
