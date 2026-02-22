@@ -5,8 +5,8 @@
 //!   runec run <module.rune> <func> [args...]
 //!   runec inspect <module.rune>
 
-use std::env;
 use rune::{Module, Runtime};
+use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -50,17 +50,23 @@ fn cmd_run(args: &[String]) {
         std::process::exit(1);
     });
 
-    let val_args: Vec<rune::Val> = args[2..].iter().map(|s| {
-        rune::Val::I32(s.parse::<i32>().unwrap_or_else(|_| {
-            eprintln!("Cannot parse arg {s:?} as i32");
-            std::process::exit(1);
-        }))
-    }).collect();
+    let val_args: Vec<rune::Val> = args[2..]
+        .iter()
+        .map(|s| {
+            rune::Val::I32(s.parse::<i32>().unwrap_or_else(|_| {
+                eprintln!("Cannot parse arg {s:?} as i32");
+                std::process::exit(1);
+            }))
+        })
+        .collect();
 
     match inst.call(func, &val_args) {
         Ok(Some(v)) => println!("{v:?}"),
-        Ok(None)    => println!("(no return value)"),
-        Err(e)      => { eprintln!("Trap: {e}"); std::process::exit(1); }
+        Ok(None) => println!("(no return value)"),
+        Err(e) => {
+            eprintln!("Trap: {e}");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -80,7 +86,10 @@ fn cmd_inspect(args: &[String]) {
     });
 
     println!("=== Rune Module: {path} ===");
-    println!("Memory: {} initial pages, max: {:?}", module.initial_memory_pages, module.max_memory_pages);
+    println!(
+        "Memory: {} initial pages, max: {:?}",
+        module.initial_memory_pages, module.max_memory_pages
+    );
     println!("Functions: {}", module.functions.len());
     for (i, f) in module.functions.iter().enumerate() {
         println!("  [{i}] {} ({} ops)", f.name, f.body.len());

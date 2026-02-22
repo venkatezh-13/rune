@@ -1,8 +1,4 @@
-use crate::{
-    instance::Instance,
-    module::Module,
-    trap::Result,
-};
+use crate::{instance::Instance, module::Module, trap::Result};
 
 /// Top-level runtime context. Currently lightweight; reserve for future
 /// shared resources (fuel budgets, JIT caches, etc.).

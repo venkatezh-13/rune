@@ -14,7 +14,10 @@ fn main() {
     // Register host function: print_i32(x: i32)
     module.register_host(
         "print_i32",
-        FuncType { params: vec![ValType::I32], results: vec![] },
+        FuncType {
+            params: vec![ValType::I32],
+            results: vec![],
+        },
         |args| {
             println!("Guest says: {}", args[0].as_i32().unwrap());
             Ok(None)
@@ -24,13 +27,12 @@ fn main() {
     // Define guest function: run()  — calls print_i32(42)
     module.functions.push(Function {
         name: "run".into(),
-        ty: FuncType { params: vec![], results: vec![] },
+        ty: FuncType {
+            params: vec![],
+            results: vec![],
+        },
         locals: vec![],
-        body: vec![
-            Op::I32Const(42),
-            Op::CallHost(0),
-            Op::Return,
-        ].into(),  // Add .into() here
+        body: vec![Op::I32Const(42), Op::CallHost(0), Op::Return].into(), // Add .into() here
     });
     module.exports.push(("run".into(), 0));
 

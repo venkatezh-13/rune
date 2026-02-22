@@ -19,16 +19,27 @@ fn fib_module() -> Module {
     let mut m = Module::new();
     m.functions.push(Function::new(
         "fib",
-        FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        FuncType {
+            params: vec![ValType::I32],
+            results: vec![ValType::I32],
+        },
         vec![],
         vec![
-            Op::LocalGet(0), Op::I32Const(1), Op::I32LeS,
+            Op::LocalGet(0),
+            Op::I32Const(1),
+            Op::I32LeS,
             Op::If(BlockType::Val(ValType::I32)),
-                Op::LocalGet(0),
+            Op::LocalGet(0),
             Op::Else,
-                Op::LocalGet(0), Op::I32Const(1), Op::I32Sub, Op::Call(0),
-                Op::LocalGet(0), Op::I32Const(2), Op::I32Sub, Op::Call(0),
-                Op::I32Add,
+            Op::LocalGet(0),
+            Op::I32Const(1),
+            Op::I32Sub,
+            Op::Call(0),
+            Op::LocalGet(0),
+            Op::I32Const(2),
+            Op::I32Sub,
+            Op::Call(0),
+            Op::I32Add,
             Op::End,
             Op::Return,
         ],
@@ -41,7 +52,10 @@ fn add_module() -> Module {
     let mut m = Module::new();
     m.functions.push(Function::new(
         "add",
-        FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I32] },
+        FuncType {
+            params: vec![ValType::I32, ValType::I32],
+            results: vec![ValType::I32],
+        },
         vec![],
         vec![Op::LocalGet(0), Op::LocalGet(1), Op::I32Add, Op::Return],
     ));
@@ -53,12 +67,18 @@ fn host_call_module() -> Module {
     let mut m = Module::new();
     m.register_host(
         "noop",
-        FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        FuncType {
+            params: vec![ValType::I32],
+            results: vec![ValType::I32],
+        },
         |args| Ok(Some(args[0])),
     );
     m.functions.push(Function::new(
         "call_host",
-        FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        FuncType {
+            params: vec![ValType::I32],
+            results: vec![ValType::I32],
+        },
         vec![],
         vec![Op::LocalGet(0), Op::CallHost(0), Op::Return],
     ));
@@ -75,9 +95,7 @@ fn bench_fibonacci(c: &mut Criterion) {
     for n in [10u32, 20, 25] {
         group.bench_with_input(BenchmarkId::new("fib", n), &n, |b, &n| {
             let mut inst = rt.instantiate(&module).unwrap();
-            b.iter(|| {
-                black_box(inst.call("fib", &[Val::I32(black_box(n as i32))]).unwrap())
-            });
+            b.iter(|| black_box(inst.call("fib", &[Val::I32(black_box(n as i32))]).unwrap()));
         });
     }
     group.finish();
@@ -89,7 +107,10 @@ fn bench_simple_call(c: &mut Criterion) {
     let mut inst = rt.instantiate(&module).unwrap();
     c.bench_function("simple_call/add(3,4)", |b| {
         b.iter(|| {
-            black_box(inst.call("add", &[Val::I32(black_box(3)), Val::I32(black_box(4))]).unwrap())
+            black_box(
+                inst.call("add", &[Val::I32(black_box(3)), Val::I32(black_box(4))])
+                    .unwrap(),
+            )
         })
     });
 }
@@ -99,9 +120,7 @@ fn bench_host_call(c: &mut Criterion) {
     let rt = Runtime::new();
     let mut inst = rt.instantiate(&module).unwrap();
     c.bench_function("host_call/round_trip", |b| {
-        b.iter(|| {
-            black_box(inst.call("call_host", &[Val::I32(black_box(42))]).unwrap())
-        })
+        b.iter(|| black_box(inst.call("call_host", &[Val::I32(black_box(42))]).unwrap()))
     });
 }
 
@@ -152,7 +171,11 @@ fn bench_memory(c: &mut Criterion) {
         let mut m = Memory::new(1, None);
         let mut offset = 0usize;
         b.iter(|| {
-            m.write_u32(black_box(offset % (PAGE_SIZE - 4)), black_box(0xDEAD_BEEFu32)).unwrap();
+            m.write_u32(
+                black_box(offset % (PAGE_SIZE - 4)),
+                black_box(0xDEAD_BEEFu32),
+            )
+            .unwrap();
             offset = offset.wrapping_add(4);
         })
     });

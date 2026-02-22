@@ -48,16 +48,32 @@ impl Val {
     }
 
     pub fn as_i32(self) -> Option<i32> {
-        if let Val::I32(v) = self { Some(v) } else { None }
+        if let Val::I32(v) = self {
+            Some(v)
+        } else {
+            None
+        }
     }
     pub fn as_i64(self) -> Option<i64> {
-        if let Val::I64(v) = self { Some(v) } else { None }
+        if let Val::I64(v) = self {
+            Some(v)
+        } else {
+            None
+        }
     }
     pub fn as_f32(self) -> Option<f32> {
-        if let Val::F32(v) = self { Some(v) } else { None }
+        if let Val::F32(v) = self {
+            Some(v)
+        } else {
+            None
+        }
     }
     pub fn as_f64(self) -> Option<f64> {
-        if let Val::F64(v) = self { Some(v) } else { None }
+        if let Val::F64(v) = self {
+            Some(v)
+        } else {
+            None
+        }
     }
 
     pub fn default_for(ty: ValType) -> Val {

@@ -54,7 +54,11 @@ impl Memory {
     }
 
     fn check(&self, offset: usize, len: usize) -> Result<()> {
-        if offset.checked_add(len).map(|end| end <= self.data.len()).unwrap_or(false) {
+        if offset
+            .checked_add(len)
+            .map(|end| end <= self.data.len())
+            .unwrap_or(false)
+        {
             Ok(())
         } else {
             Err(Trap::OutOfBounds)

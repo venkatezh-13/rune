@@ -67,7 +67,10 @@ impl Module {
 
     /// Find an export by name. Returns function index.
     pub fn find_export(&self, name: &str) -> Option<u32> {
-        self.exports.iter().find(|(n, _)| n == name).map(|(_, idx)| *idx)
+        self.exports
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, idx)| *idx)
     }
 
     // ── Serialisation (binary .rune format) ──────────────────────────────────
@@ -106,7 +109,9 @@ impl Module {
             // FIX: compact binary op encoding — ~1.3 bytes/op vs ~12 bytes/op (JSON).
             // This cuts module parse time by ~10x, fixing the cold-start benchmark.
             let mut ops_buf = Vec::with_capacity(f.body.len() * 2);
-            for op in f.body.iter() { encode_op(op, &mut ops_buf); }
+            for op in f.body.iter() {
+                encode_op(op, &mut ops_buf);
+            }
             write_bytes_len(&mut out, &ops_buf);
         }
 
@@ -138,17 +143,25 @@ impl Module {
         let version = read_u32(data, &mut cur)
             .ok_or_else(|| Trap::InvalidModule("truncated version".into()))?;
         if version != VERSION {
-            return Err(Trap::InvalidModule(format!("unsupported version {version:#x}")));
+            return Err(Trap::InvalidModule(format!(
+                "unsupported version {version:#x}"
+            )));
         }
 
         let initial_memory_pages = read_u32(data, &mut cur)
-            .ok_or_else(|| Trap::InvalidModule("truncated memory info".into()))? as usize;
+            .ok_or_else(|| Trap::InvalidModule("truncated memory info".into()))?
+            as usize;
         let max_raw = read_u32(data, &mut cur)
             .ok_or_else(|| Trap::InvalidModule("truncated memory info".into()))?;
-        let max_memory_pages = if max_raw == 0 { None } else { Some(max_raw as usize) };
+        let max_memory_pages = if max_raw == 0 {
+            None
+        } else {
+            Some(max_raw as usize)
+        };
 
         let n_funcs = read_u32(data, &mut cur)
-            .ok_or_else(|| Trap::InvalidModule("truncated fn count".into()))? as usize;
+            .ok_or_else(|| Trap::InvalidModule("truncated fn count".into()))?
+            as usize;
 
         let mut functions = Vec::with_capacity(n_funcs);
         for _ in 0..n_funcs {
@@ -173,7 +186,8 @@ impl Module {
         }
 
         let n_exports = read_u32(data, &mut cur)
-            .ok_or_else(|| Trap::InvalidModule("truncated exports".into()))? as usize;
+            .ok_or_else(|| Trap::InvalidModule("truncated exports".into()))?
+            as usize;
         let mut exports = Vec::with_capacity(n_exports);
         for _ in 0..n_exports {
             let name = read_str(data, &mut cur)
@@ -184,7 +198,8 @@ impl Module {
         }
 
         let n_data = read_u32(data, &mut cur)
-            .ok_or_else(|| Trap::InvalidModule("truncated data count".into()))? as usize;
+            .ok_or_else(|| Trap::InvalidModule("truncated data count".into()))?
+            as usize;
         let mut data_segments = Vec::with_capacity(n_data);
         for _ in 0..n_data {
             let offset = read_u32(data, &mut cur)
@@ -232,7 +247,9 @@ fn write_bytes_len(out: &mut Vec<u8>, bytes: &[u8]) {
 }
 
 fn read_arr<const N: usize>(data: &[u8], cur: &mut usize) -> Option<[u8; N]> {
-    if *cur + N > data.len() { return None; }
+    if *cur + N > data.len() {
+        return None;
+    }
     let arr: [u8; N] = data[*cur..*cur + N].try_into().ok()?;
     *cur += N;
     Some(arr)
@@ -245,8 +262,12 @@ fn read_u32(data: &[u8], cur: &mut usize) -> Option<u32> {
 
 fn read_str(data: &[u8], cur: &mut usize) -> Option<String> {
     let len = read_u32(data, cur)? as usize;
-    if *cur + len > data.len() { return None; }
-    let s = std::str::from_utf8(&data[*cur..*cur + len]).ok()?.to_string();
+    if *cur + len > data.len() {
+        return None;
+    }
+    let s = std::str::from_utf8(&data[*cur..*cur + len])
+        .ok()?
+        .to_string();
     *cur += len;
     Some(s)
 }
@@ -255,7 +276,9 @@ fn read_valtypes(data: &[u8], cur: &mut usize) -> Option<Vec<ValType>> {
     let len = read_u32(data, cur)? as usize;
     let mut out = Vec::with_capacity(len);
     for _ in 0..len {
-        if *cur >= data.len() { return None; }
+        if *cur >= data.len() {
+            return None;
+        }
         let b = data[*cur];
         *cur += 1;
         out.push(ValType::from_u8(b)?);
@@ -265,7 +288,9 @@ fn read_valtypes(data: &[u8], cur: &mut usize) -> Option<Vec<ValType>> {
 
 fn read_bytes_len<'a>(data: &'a [u8], cur: &mut usize) -> Option<&'a [u8]> {
     let len = read_u32(data, cur)? as usize;
-    if *cur + len > data.len() { return None; }
+    if *cur + len > data.len() {
+        return None;
+    }
     let bytes = &data[*cur..*cur + len];
     *cur += len;
     Some(bytes)
@@ -304,33 +329,119 @@ use crate::ir::{BlockType, Op};
 
 // Simple (no-payload) ops, in order. Index = opcode byte 0x00..
 static SIMPLE_OPS: &[Op] = &[
-    Op::Nop, Op::Drop, Op::Select, Op::Return, Op::Else, Op::End,
-    Op::Unreachable, Op::MemorySize, Op::MemoryGrow,
-    Op::I32Add, Op::I32Sub, Op::I32Mul, Op::I32DivS, Op::I32DivU,
-    Op::I32RemS, Op::I32RemU, Op::I32And, Op::I32Or, Op::I32Xor,
-    Op::I32Shl, Op::I32ShrS, Op::I32ShrU, Op::I32Clz, Op::I32Ctz, Op::I32Popcnt, Op::I32Eqz,
-    Op::I64Add, Op::I64Sub, Op::I64Mul, Op::I64DivS, Op::I64DivU,
-    Op::I64RemS, Op::I64RemU, Op::I64And, Op::I64Or, Op::I64Xor,
-    Op::I64Shl, Op::I64ShrS, Op::I64ShrU, Op::I64Eqz,
-    Op::F32Add, Op::F32Sub, Op::F32Mul, Op::F32Div, Op::F32Sqrt,
-    Op::F32Min, Op::F32Max, Op::F32Abs, Op::F32Neg, Op::F32Ceil, Op::F32Floor,
-    Op::F64Add, Op::F64Sub, Op::F64Mul, Op::F64Div, Op::F64Sqrt,
-    Op::F64Min, Op::F64Max, Op::F64Abs, Op::F64Neg, Op::F64Ceil, Op::F64Floor,
-    Op::I32Eq,  Op::I32Ne,  Op::I32LtS, Op::I32LtU, Op::I32GtS, Op::I32GtU,
-    Op::I32LeS, Op::I32LeU, Op::I32GeS, Op::I32GeU,
-    Op::I64Eq,  Op::I64Ne,  Op::I64LtS, Op::I64LtU, Op::I64GtS, Op::I64GtU,
-    Op::I64LeS, Op::I64LeU, Op::I64GeS, Op::I64GeU,
-    Op::F32Eq,  Op::F32Ne,  Op::F32Lt,  Op::F32Gt,  Op::F32Le,  Op::F32Ge,
-    Op::F64Eq,  Op::F64Ne,  Op::F64Lt,  Op::F64Gt,  Op::F64Le,  Op::F64Ge,
+    Op::Nop,
+    Op::Drop,
+    Op::Select,
+    Op::Return,
+    Op::Else,
+    Op::End,
+    Op::Unreachable,
+    Op::MemorySize,
+    Op::MemoryGrow,
+    Op::I32Add,
+    Op::I32Sub,
+    Op::I32Mul,
+    Op::I32DivS,
+    Op::I32DivU,
+    Op::I32RemS,
+    Op::I32RemU,
+    Op::I32And,
+    Op::I32Or,
+    Op::I32Xor,
+    Op::I32Shl,
+    Op::I32ShrS,
+    Op::I32ShrU,
+    Op::I32Clz,
+    Op::I32Ctz,
+    Op::I32Popcnt,
+    Op::I32Eqz,
+    Op::I64Add,
+    Op::I64Sub,
+    Op::I64Mul,
+    Op::I64DivS,
+    Op::I64DivU,
+    Op::I64RemS,
+    Op::I64RemU,
+    Op::I64And,
+    Op::I64Or,
+    Op::I64Xor,
+    Op::I64Shl,
+    Op::I64ShrS,
+    Op::I64ShrU,
+    Op::I64Eqz,
+    Op::F32Add,
+    Op::F32Sub,
+    Op::F32Mul,
+    Op::F32Div,
+    Op::F32Sqrt,
+    Op::F32Min,
+    Op::F32Max,
+    Op::F32Abs,
+    Op::F32Neg,
+    Op::F32Ceil,
+    Op::F32Floor,
+    Op::F64Add,
+    Op::F64Sub,
+    Op::F64Mul,
+    Op::F64Div,
+    Op::F64Sqrt,
+    Op::F64Min,
+    Op::F64Max,
+    Op::F64Abs,
+    Op::F64Neg,
+    Op::F64Ceil,
+    Op::F64Floor,
+    Op::I32Eq,
+    Op::I32Ne,
+    Op::I32LtS,
+    Op::I32LtU,
+    Op::I32GtS,
+    Op::I32GtU,
+    Op::I32LeS,
+    Op::I32LeU,
+    Op::I32GeS,
+    Op::I32GeU,
+    Op::I64Eq,
+    Op::I64Ne,
+    Op::I64LtS,
+    Op::I64LtU,
+    Op::I64GtS,
+    Op::I64GtU,
+    Op::I64LeS,
+    Op::I64LeU,
+    Op::I64GeS,
+    Op::I64GeU,
+    Op::F32Eq,
+    Op::F32Ne,
+    Op::F32Lt,
+    Op::F32Gt,
+    Op::F32Le,
+    Op::F32Ge,
+    Op::F64Eq,
+    Op::F64Ne,
+    Op::F64Lt,
+    Op::F64Gt,
+    Op::F64Le,
+    Op::F64Ge,
     Op::I32WrapI64,
-    Op::I64ExtendI32S, Op::I64ExtendI32U,
-    Op::F32ConvertI32S, Op::F32ConvertI32U,
-    Op::F64ConvertI32S, Op::F64ConvertI32U,
-    Op::F64ConvertI64S, Op::F64ConvertI64U,
-    Op::I32TruncF32S, Op::I32TruncF32U, Op::I32TruncF64S, Op::I32TruncF64U,
-    Op::F32DemoteF64, Op::F64PromoteF32,
-    Op::I32ReinterpretF32, Op::F32ReinterpretI32,
-    Op::I64ReinterpretF64, Op::F64ReinterpretI64,
+    Op::I64ExtendI32S,
+    Op::I64ExtendI32U,
+    Op::F32ConvertI32S,
+    Op::F32ConvertI32U,
+    Op::F64ConvertI32S,
+    Op::F64ConvertI32U,
+    Op::F64ConvertI64S,
+    Op::F64ConvertI64U,
+    Op::I32TruncF32S,
+    Op::I32TruncF32U,
+    Op::I32TruncF64S,
+    Op::I32TruncF64U,
+    Op::F32DemoteF64,
+    Op::F64PromoteF32,
+    Op::I32ReinterpretF32,
+    Op::F32ReinterpretI32,
+    Op::I64ReinterpretF64,
+    Op::F64ReinterpretI64,
 ];
 
 fn encode_op(op: &Op, out: &mut Vec<u8>) {
@@ -339,35 +450,121 @@ fn encode_op(op: &Op, out: &mut Vec<u8>) {
         if std::mem::discriminant(op) == std::mem::discriminant(s) {
             // Verify it's not a variant with payload that happens to have same discriminant.
             // All simple ops have no payload fields, so discriminant match suffices.
-            if matches!(op,
-                Op::Nop | Op::Drop | Op::Select | Op::Return | Op::Else | Op::End |
-                Op::Unreachable | Op::MemorySize | Op::MemoryGrow |
-                Op::I32Add | Op::I32Sub | Op::I32Mul | Op::I32DivS | Op::I32DivU |
-                Op::I32RemS | Op::I32RemU | Op::I32And | Op::I32Or | Op::I32Xor |
-                Op::I32Shl | Op::I32ShrS | Op::I32ShrU | Op::I32Clz | Op::I32Ctz |
-                Op::I32Popcnt | Op::I32Eqz |
-                Op::I64Add | Op::I64Sub | Op::I64Mul | Op::I64DivS | Op::I64DivU |
-                Op::I64RemS | Op::I64RemU | Op::I64And | Op::I64Or | Op::I64Xor |
-                Op::I64Shl | Op::I64ShrS | Op::I64ShrU | Op::I64Eqz |
-                Op::F32Add | Op::F32Sub | Op::F32Mul | Op::F32Div | Op::F32Sqrt |
-                Op::F32Min | Op::F32Max | Op::F32Abs | Op::F32Neg | Op::F32Ceil | Op::F32Floor |
-                Op::F64Add | Op::F64Sub | Op::F64Mul | Op::F64Div | Op::F64Sqrt |
-                Op::F64Min | Op::F64Max | Op::F64Abs | Op::F64Neg | Op::F64Ceil | Op::F64Floor |
-                Op::I32Eq  | Op::I32Ne  | Op::I32LtS | Op::I32LtU | Op::I32GtS | Op::I32GtU |
-                Op::I32LeS | Op::I32LeU | Op::I32GeS | Op::I32GeU |
-                Op::I64Eq  | Op::I64Ne  | Op::I64LtS | Op::I64LtU | Op::I64GtS | Op::I64GtU |
-                Op::I64LeS | Op::I64LeU | Op::I64GeS | Op::I64GeU |
-                Op::F32Eq  | Op::F32Ne  | Op::F32Lt  | Op::F32Gt  | Op::F32Le  | Op::F32Ge  |
-                Op::F64Eq  | Op::F64Ne  | Op::F64Lt  | Op::F64Gt  | Op::F64Le  | Op::F64Ge  |
-                Op::I32WrapI64 |
-                Op::I64ExtendI32S | Op::I64ExtendI32U |
-                Op::F32ConvertI32S | Op::F32ConvertI32U |
-                Op::F64ConvertI32S | Op::F64ConvertI32U |
-                Op::F64ConvertI64S | Op::F64ConvertI64U |
-                Op::I32TruncF32S | Op::I32TruncF32U | Op::I32TruncF64S | Op::I32TruncF64U |
-                Op::F32DemoteF64 | Op::F64PromoteF32 |
-                Op::I32ReinterpretF32 | Op::F32ReinterpretI32 |
-                Op::I64ReinterpretF64 | Op::F64ReinterpretI64
+            if matches!(
+                op,
+                Op::Nop
+                    | Op::Drop
+                    | Op::Select
+                    | Op::Return
+                    | Op::Else
+                    | Op::End
+                    | Op::Unreachable
+                    | Op::MemorySize
+                    | Op::MemoryGrow
+                    | Op::I32Add
+                    | Op::I32Sub
+                    | Op::I32Mul
+                    | Op::I32DivS
+                    | Op::I32DivU
+                    | Op::I32RemS
+                    | Op::I32RemU
+                    | Op::I32And
+                    | Op::I32Or
+                    | Op::I32Xor
+                    | Op::I32Shl
+                    | Op::I32ShrS
+                    | Op::I32ShrU
+                    | Op::I32Clz
+                    | Op::I32Ctz
+                    | Op::I32Popcnt
+                    | Op::I32Eqz
+                    | Op::I64Add
+                    | Op::I64Sub
+                    | Op::I64Mul
+                    | Op::I64DivS
+                    | Op::I64DivU
+                    | Op::I64RemS
+                    | Op::I64RemU
+                    | Op::I64And
+                    | Op::I64Or
+                    | Op::I64Xor
+                    | Op::I64Shl
+                    | Op::I64ShrS
+                    | Op::I64ShrU
+                    | Op::I64Eqz
+                    | Op::F32Add
+                    | Op::F32Sub
+                    | Op::F32Mul
+                    | Op::F32Div
+                    | Op::F32Sqrt
+                    | Op::F32Min
+                    | Op::F32Max
+                    | Op::F32Abs
+                    | Op::F32Neg
+                    | Op::F32Ceil
+                    | Op::F32Floor
+                    | Op::F64Add
+                    | Op::F64Sub
+                    | Op::F64Mul
+                    | Op::F64Div
+                    | Op::F64Sqrt
+                    | Op::F64Min
+                    | Op::F64Max
+                    | Op::F64Abs
+                    | Op::F64Neg
+                    | Op::F64Ceil
+                    | Op::F64Floor
+                    | Op::I32Eq
+                    | Op::I32Ne
+                    | Op::I32LtS
+                    | Op::I32LtU
+                    | Op::I32GtS
+                    | Op::I32GtU
+                    | Op::I32LeS
+                    | Op::I32LeU
+                    | Op::I32GeS
+                    | Op::I32GeU
+                    | Op::I64Eq
+                    | Op::I64Ne
+                    | Op::I64LtS
+                    | Op::I64LtU
+                    | Op::I64GtS
+                    | Op::I64GtU
+                    | Op::I64LeS
+                    | Op::I64LeU
+                    | Op::I64GeS
+                    | Op::I64GeU
+                    | Op::F32Eq
+                    | Op::F32Ne
+                    | Op::F32Lt
+                    | Op::F32Gt
+                    | Op::F32Le
+                    | Op::F32Ge
+                    | Op::F64Eq
+                    | Op::F64Ne
+                    | Op::F64Lt
+                    | Op::F64Gt
+                    | Op::F64Le
+                    | Op::F64Ge
+                    | Op::I32WrapI64
+                    | Op::I64ExtendI32S
+                    | Op::I64ExtendI32U
+                    | Op::F32ConvertI32S
+                    | Op::F32ConvertI32U
+                    | Op::F64ConvertI32S
+                    | Op::F64ConvertI32U
+                    | Op::F64ConvertI64S
+                    | Op::F64ConvertI64U
+                    | Op::I32TruncF32S
+                    | Op::I32TruncF32U
+                    | Op::I32TruncF64S
+                    | Op::I32TruncF64U
+                    | Op::F32DemoteF64
+                    | Op::F64PromoteF32
+                    | Op::I32ReinterpretF32
+                    | Op::F32ReinterpretI32
+                    | Op::I64ReinterpretF64
+                    | Op::F64ReinterpretI64
             ) {
                 out.push(i as u8);
                 return;
@@ -376,42 +573,118 @@ fn encode_op(op: &Op, out: &mut Vec<u8>) {
     }
     // Payload ops.
     match op {
-        Op::I32Const(v)  => { out.push(0x80); out.extend_from_slice(&v.to_le_bytes()); }
-        Op::I64Const(v)  => { out.push(0x81); out.extend_from_slice(&v.to_le_bytes()); }
-        Op::F32Const(v)  => { out.push(0x82); out.extend_from_slice(&v.to_bits().to_le_bytes()); }
-        Op::F64Const(v)  => { out.push(0x83); out.extend_from_slice(&v.to_bits().to_le_bytes()); }
-        Op::LocalGet(i)  => { out.push(0x84); out.extend_from_slice(&i.to_le_bytes()); }
-        Op::LocalSet(i)  => { out.push(0x85); out.extend_from_slice(&i.to_le_bytes()); }
-        Op::LocalTee(i)  => { out.push(0x86); out.extend_from_slice(&i.to_le_bytes()); }
-        Op::Call(i)      => { out.push(0x87); out.extend_from_slice(&i.to_le_bytes()); }
-        Op::CallHost(i)  => { out.push(0x88); out.extend_from_slice(&i.to_le_bytes()); }
-        Op::Br(d)        => { out.push(0x89); out.extend_from_slice(&d.to_le_bytes()); }
-        Op::BrIf(d)      => { out.push(0x8A); out.extend_from_slice(&d.to_le_bytes()); }
-        Op::Block(bt)    => { out.push(0x8B); out.push(encode_bt(bt)); }
-        Op::Loop(bt)     => { out.push(0x8C); out.push(encode_bt(bt)); }
-        Op::If(bt)       => { out.push(0x8D); out.push(encode_bt(bt)); }
-        Op::I32Load  { align, offset } => { out.push(0x8E); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::I32Store { align, offset } => { out.push(0x8F); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::I64Load  { align, offset } => { out.push(0x90); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::I64Store { align, offset } => { out.push(0x91); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::F32Load  { align, offset } => { out.push(0x92); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::F32Store { align, offset } => { out.push(0x93); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::F64Load  { align, offset } => { out.push(0x94); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
-        Op::F64Store { align, offset } => { out.push(0x95); out.extend_from_slice(&align.to_le_bytes()); out.extend_from_slice(&offset.to_le_bytes()); }
+        Op::I32Const(v) => {
+            out.push(0x80);
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        Op::I64Const(v) => {
+            out.push(0x81);
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        Op::F32Const(v) => {
+            out.push(0x82);
+            out.extend_from_slice(&v.to_bits().to_le_bytes());
+        }
+        Op::F64Const(v) => {
+            out.push(0x83);
+            out.extend_from_slice(&v.to_bits().to_le_bytes());
+        }
+        Op::LocalGet(i) => {
+            out.push(0x84);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Op::LocalSet(i) => {
+            out.push(0x85);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Op::LocalTee(i) => {
+            out.push(0x86);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Op::Call(i) => {
+            out.push(0x87);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Op::CallHost(i) => {
+            out.push(0x88);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Op::Br(d) => {
+            out.push(0x89);
+            out.extend_from_slice(&d.to_le_bytes());
+        }
+        Op::BrIf(d) => {
+            out.push(0x8A);
+            out.extend_from_slice(&d.to_le_bytes());
+        }
+        Op::Block(bt) => {
+            out.push(0x8B);
+            out.push(encode_bt(bt));
+        }
+        Op::Loop(bt) => {
+            out.push(0x8C);
+            out.push(encode_bt(bt));
+        }
+        Op::If(bt) => {
+            out.push(0x8D);
+            out.push(encode_bt(bt));
+        }
+        Op::I32Load { align, offset } => {
+            out.push(0x8E);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::I32Store { align, offset } => {
+            out.push(0x8F);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::I64Load { align, offset } => {
+            out.push(0x90);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::I64Store { align, offset } => {
+            out.push(0x91);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::F32Load { align, offset } => {
+            out.push(0x92);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::F32Store { align, offset } => {
+            out.push(0x93);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::F64Load { align, offset } => {
+            out.push(0x94);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
+        Op::F64Store { align, offset } => {
+            out.push(0x95);
+            out.extend_from_slice(&align.to_le_bytes());
+            out.extend_from_slice(&offset.to_le_bytes());
+        }
         _ => {} // unknown ops silently skipped (shouldn't happen)
     }
 }
 
 fn encode_bt(bt: &BlockType) -> u8 {
     match bt {
-        BlockType::Empty   => 0x40,
+        BlockType::Empty => 0x40,
         BlockType::Val(vt) => *vt as u8,
     }
 }
 
 fn decode_bt(b: u8) -> Option<BlockType> {
     use crate::types::ValType;
-    if b == 0x40 { return Some(BlockType::Empty); }
+    if b == 0x40 {
+        return Some(BlockType::Empty);
+    }
     ValType::from_u8(b).map(BlockType::Val)
 }
 
@@ -420,7 +693,8 @@ fn decode_ops(data: &[u8]) -> Option<std::sync::Arc<Vec<Op>>> {
     let mut i = 0usize;
 
     while i < data.len() {
-        let byte = data[i]; i += 1;
+        let byte = data[i];
+        i += 1;
 
         if (byte as usize) < SIMPLE_OPS.len() {
             ops.push(SIMPLE_OPS[byte as usize].clone());
@@ -429,22 +703,31 @@ fn decode_ops(data: &[u8]) -> Option<std::sync::Arc<Vec<Op>>> {
 
         macro_rules! read4 {
             () => {{
-                if i + 4 > data.len() { return None; }
-                let v = u32::from_le_bytes(data[i..i+4].try_into().ok()?);
-                i += 4; v
+                if i + 4 > data.len() {
+                    return None;
+                }
+                let v = u32::from_le_bytes(data[i..i + 4].try_into().ok()?);
+                i += 4;
+                v
             }};
         }
         macro_rules! read8 {
             () => {{
-                if i + 8 > data.len() { return None; }
-                let v = u64::from_le_bytes(data[i..i+8].try_into().ok()?);
-                i += 8; v
+                if i + 8 > data.len() {
+                    return None;
+                }
+                let v = u64::from_le_bytes(data[i..i + 8].try_into().ok()?);
+                i += 8;
+                v
             }};
         }
         macro_rules! read_bt {
             () => {{
-                if i >= data.len() { return None; }
-                let b = data[i]; i += 1;
+                if i >= data.len() {
+                    return None;
+                }
+                let b = data[i];
+                i += 1;
                 decode_bt(b)?
             }};
         }
@@ -464,14 +747,70 @@ fn decode_ops(data: &[u8]) -> Option<std::sync::Arc<Vec<Op>>> {
             0x8B => Op::Block(read_bt!()),
             0x8C => Op::Loop(read_bt!()),
             0x8D => Op::If(read_bt!()),
-            0x8E => { let a=read4!(); let o=read4!(); Op::I32Load  { align: a, offset: o } }
-            0x8F => { let a=read4!(); let o=read4!(); Op::I32Store { align: a, offset: o } }
-            0x90 => { let a=read4!(); let o=read4!(); Op::I64Load  { align: a, offset: o } }
-            0x91 => { let a=read4!(); let o=read4!(); Op::I64Store { align: a, offset: o } }
-            0x92 => { let a=read4!(); let o=read4!(); Op::F32Load  { align: a, offset: o } }
-            0x93 => { let a=read4!(); let o=read4!(); Op::F32Store { align: a, offset: o } }
-            0x94 => { let a=read4!(); let o=read4!(); Op::F64Load  { align: a, offset: o } }
-            0x95 => { let a=read4!(); let o=read4!(); Op::F64Store { align: a, offset: o } }
+            0x8E => {
+                let a = read4!();
+                let o = read4!();
+                Op::I32Load {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x8F => {
+                let a = read4!();
+                let o = read4!();
+                Op::I32Store {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x90 => {
+                let a = read4!();
+                let o = read4!();
+                Op::I64Load {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x91 => {
+                let a = read4!();
+                let o = read4!();
+                Op::I64Store {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x92 => {
+                let a = read4!();
+                let o = read4!();
+                Op::F32Load {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x93 => {
+                let a = read4!();
+                let o = read4!();
+                Op::F32Store {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x94 => {
+                let a = read4!();
+                let o = read4!();
+                Op::F64Load {
+                    align: a,
+                    offset: o,
+                }
+            }
+            0x95 => {
+                let a = read4!();
+                let o = read4!();
+                Op::F64Store {
+                    align: a,
+                    offset: o,
+                }
+            }
             _ => return None,
         };
         ops.push(op);

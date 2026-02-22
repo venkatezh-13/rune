@@ -21,10 +21,10 @@
 //! ```
 
 pub mod ffi;
+pub mod instance;
 pub mod ir;
 pub mod memory;
 pub mod module;
-pub mod instance;
 pub mod runtime;
 pub mod stack;
 pub mod trap;

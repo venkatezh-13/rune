@@ -18,21 +18,31 @@ fn build_plugin() -> Vec<u8> {
     // Fibonacci function
     m.functions.push(Function {
         name: "fib".into(),
-        ty: FuncType { params: vec![ValType::I32], results: vec![ValType::I32] },
+        ty: FuncType {
+            params: vec![ValType::I32],
+            results: vec![ValType::I32],
+        },
         locals: vec![],
         body: vec![
             Op::LocalGet(0),
             Op::I32Const(1),
             Op::I32LeS,
             Op::If(BlockType::Val(ValType::I32)),
-                Op::LocalGet(0),
+            Op::LocalGet(0),
             Op::Else,
-                Op::LocalGet(0), Op::I32Const(1), Op::I32Sub, Op::Call(0),
-                Op::LocalGet(0), Op::I32Const(2), Op::I32Sub, Op::Call(0),
-                Op::I32Add,
+            Op::LocalGet(0),
+            Op::I32Const(1),
+            Op::I32Sub,
+            Op::Call(0),
+            Op::LocalGet(0),
+            Op::I32Const(2),
+            Op::I32Sub,
+            Op::Call(0),
+            Op::I32Add,
             Op::End,
             Op::Return,
-        ].into(),  // Add .into() here
+        ]
+        .into(), // Add .into() here
     });
     m.exports.push(("fib".into(), 0));
 

@@ -17,9 +17,9 @@ use std::ptr;
 use std::slice;
 
 use crate::{
+    instance::Instance,
     module::Module,
     runtime::Runtime,
-    instance::Instance,
     trap::Trap,
     types::{FuncType, Val, ValType},
 };
@@ -28,32 +28,32 @@ use crate::{
 
 #[repr(C)]
 pub enum RuneError {
-    Ok                = 0,
-    InvalidModule     = 1,
-    OutOfMemory       = 2,
-    TrapOutOfBounds   = 3,
-    TrapDivZero       = 4,
-    TrapUnreachable   = 5,
+    Ok = 0,
+    InvalidModule = 1,
+    OutOfMemory = 2,
+    TrapOutOfBounds = 3,
+    TrapDivZero = 4,
+    TrapUnreachable = 5,
     TrapStackOverflow = 6,
-    TrapTypeMismatch  = 7,
-    UndefinedExport   = 8,
-    UndefinedImport   = 9,
-    HostError         = 10,
+    TrapTypeMismatch = 7,
+    UndefinedExport = 8,
+    UndefinedImport = 9,
+    HostError = 10,
 }
 
 impl From<&Trap> for RuneError {
     fn from(t: &Trap) -> Self {
         match t {
-            Trap::OutOfBounds       => RuneError::TrapOutOfBounds,
-            Trap::OutOfMemory       => RuneError::OutOfMemory,
-            Trap::DivisionByZero    => RuneError::TrapDivZero,
-            Trap::Unreachable       => RuneError::TrapUnreachable,
-            Trap::StackOverflow     => RuneError::TrapStackOverflow,
-            Trap::TypeMismatch      => RuneError::TrapTypeMismatch,
-            Trap::UndefinedExport(_)=> RuneError::UndefinedExport,
-            Trap::UndefinedImport(_)=> RuneError::UndefinedImport,
-            Trap::InvalidModule(_)  => RuneError::InvalidModule,
-            Trap::HostError(_)      => RuneError::HostError,
+            Trap::OutOfBounds => RuneError::TrapOutOfBounds,
+            Trap::OutOfMemory => RuneError::OutOfMemory,
+            Trap::DivisionByZero => RuneError::TrapDivZero,
+            Trap::Unreachable => RuneError::TrapUnreachable,
+            Trap::StackOverflow => RuneError::TrapStackOverflow,
+            Trap::TypeMismatch => RuneError::TrapTypeMismatch,
+            Trap::UndefinedExport(_) => RuneError::UndefinedExport,
+            Trap::UndefinedImport(_) => RuneError::UndefinedImport,
+            Trap::InvalidModule(_) => RuneError::InvalidModule,
+            Trap::HostError(_) => RuneError::HostError,
         }
     }
 }
@@ -154,7 +154,9 @@ pub extern "C" fn rune_runtime_new() -> *mut CRuntime {
 /// Must only be called with a pointer returned by `rune_runtime_new`.
 #[no_mangle]
 pub unsafe extern "C" fn rune_runtime_free(rt: *mut CRuntime) {
-    if !rt.is_null() { drop(Box::from_raw(rt)); }
+    if !rt.is_null() {
+        drop(Box::from_raw(rt));
+    }
 }
 
 // ── Module loading ────────────────────────────────────────────────────────────
@@ -167,7 +169,9 @@ pub unsafe extern "C" fn rune_module_load_bytes(
     data: *const u8,
     len: usize,
 ) -> *mut CModule {
-    if data.is_null() { return ptr::null_mut(); }
+    if data.is_null() {
+        return ptr::null_mut();
+    }
     let bytes = slice::from_raw_parts(data, len);
     match Module::from_bytes(bytes) {
         Ok(m) => Box::into_raw(Box::new(CModule(m))),
@@ -182,7 +186,9 @@ pub unsafe extern "C" fn rune_module_load_file(
     rt: *mut CRuntime,
     path: *const c_char,
 ) -> *mut CModule {
-    if path.is_null() { return ptr::null_mut(); }
+    if path.is_null() {
+        return ptr::null_mut();
+    }
     let path_str = match CStr::from_ptr(path).to_str() {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
@@ -197,7 +203,9 @@ pub unsafe extern "C" fn rune_module_load_file(
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn rune_module_free(module: *mut CModule) {
-    if !module.is_null() { drop(Box::from_raw(module)); }
+    if !module.is_null() {
+        drop(Box::from_raw(module));
+    }
 }
 
 // ── Error strings ─────────────────────────────────────────────────────────────
@@ -205,17 +213,17 @@ pub unsafe extern "C" fn rune_module_free(module: *mut CModule) {
 #[no_mangle]
 pub extern "C" fn rune_error_string(err: RuneError) -> *const c_char {
     let s = match err {
-        RuneError::Ok                => "ok\0",
-        RuneError::InvalidModule     => "invalid module\0",
-        RuneError::OutOfMemory       => "out of memory\0",
-        RuneError::TrapOutOfBounds   => "memory out-of-bounds\0",
-        RuneError::TrapDivZero       => "integer divide by zero\0",
-        RuneError::TrapUnreachable   => "unreachable executed\0",
+        RuneError::Ok => "ok\0",
+        RuneError::InvalidModule => "invalid module\0",
+        RuneError::OutOfMemory => "out of memory\0",
+        RuneError::TrapOutOfBounds => "memory out-of-bounds\0",
+        RuneError::TrapDivZero => "integer divide by zero\0",
+        RuneError::TrapUnreachable => "unreachable executed\0",
         RuneError::TrapStackOverflow => "stack overflow\0",
-        RuneError::TrapTypeMismatch  => "type mismatch\0",
-        RuneError::UndefinedExport   => "undefined export\0",
-        RuneError::UndefinedImport   => "undefined import\0",
-        RuneError::HostError         => "host error\0",
+        RuneError::TrapTypeMismatch => "type mismatch\0",
+        RuneError::UndefinedExport => "undefined export\0",
+        RuneError::UndefinedImport => "undefined import\0",
+        RuneError::HostError => "host error\0",
     };
     s.as_ptr() as *const c_char
 }
