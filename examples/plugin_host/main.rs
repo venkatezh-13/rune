@@ -32,7 +32,7 @@ fn build_plugin() -> Vec<u8> {
                 Op::I32Add,
             Op::End,
             Op::Return,
-        ],
+        ].into(),  // Add .into() here
     });
     m.exports.push(("fib".into(), 0));
 
