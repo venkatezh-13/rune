@@ -11,7 +11,7 @@
 use crate::trap::{Result, Trap};
 
 /// Default stack size: 1MB — enough for ~10k recursive calls.
-pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
+pub const DEFAULT_STACK_SIZE: usize = 1024 * 1024;
 
 /// A native stack allocation for AOT-compiled guest code.
 ///
