@@ -169,22 +169,40 @@ impl<'m> Instance<'m> {
 
         // ── Branch macro: Fix 2 — O(1) table lookup, no Vec allocation ───────
         macro_rules! do_branch {
-            ($depth:expr) => {{
-                let depth  = $depth as usize;
-                let frame  = ctrl.get(ctrl.len().saturating_sub(1 + depth))
-                    .ok_or(Trap::TypeMismatch)?;
-                let is_loop   = frame.kind == FrameKind::Loop;
-                let target    = frame.target_pc;
-                let base      = frame.stack_base;
-                let result    = if !is_loop {
-                    frame.result_type.and_then(|_| stack.last().copied())
-                } else { None };
-                for _ in 0..=depth { ctrl.pop(); }
-                stack.truncate(base);
-                if let Some(v) = result { stack.push(v); }
-                if is_loop { target + 1 } else { target }
-            }};
+    ($depth:expr) => {{
+        let depth  = $depth as usize;
+        let frame  = ctrl.get(ctrl.len().saturating_sub(1 + depth))
+            .ok_or(Trap::TypeMismatch)?;
+        let is_loop   = frame.kind == FrameKind::Loop;
+        let target    = frame.target_pc;
+        let base      = frame.stack_base;
+        
+        // Capture result BEFORE manipulating stack if this is a block with result
+        let result = if !is_loop {
+            if let Some(ty) = frame.result_type {
+                // The top of stack should be the result value
+                Some(stack.last().ok_or(Trap::TypeMismatch)?.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        // Pop control frames
+        for _ in 0..=depth { ctrl.pop(); }
+        
+        // Restore stack to base
+        stack.truncate(base);
+        
+        // Push result if any
+        if let Some(v) = result { 
+            stack.push(v); 
         }
+        
+        if is_loop { target + 1 } else { target }
+    }};
+}
 
         loop {
             if pc >= ops.len() { break; }
