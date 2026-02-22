@@ -1,4 +1,9 @@
 #![allow(clippy::type_complexity)]
+// Add this near the top of the file
+pub type HostFunc = Box<dyn Fn(&[Val]) -> Result<Option<Val>> + Send + Sync>;
+
+// Then change line 18 to:
+pub func: HostFunc,
 use crate::{
     ir::Function,
     trap::{Result, Trap},
