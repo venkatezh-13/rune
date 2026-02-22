@@ -4,7 +4,6 @@
 //! and verifies the output. This exercises the full pipeline:
 //!   Module builder → Module::to_bytes → Module::from_bytes → Instance::call
 
-
 use rune::{
     ir::{BlockType, Function, Op},
     module::Module,
@@ -313,19 +312,31 @@ fn test_loop_countdown() {
     // count down from N to 0 using a loop, return 0
     // locals: [count (param)]
     let m = single_func("countdown", &[ValType::I32], Some(ValType::I32), vec![
-        Op::Loop(BlockType::Empty),
-            Op::LocalGet(0),
-            Op::I32Eqz,
-            Op::BrIf(0),         // exit loop when count == 0
-            Op::LocalGet(0),
-            Op::I32Const(1),
-            Op::I32Sub,
-            Op::LocalSet(0),
-            Op::Br(0),           // continue loop
+        // Outer block for breaking out when count reaches 0
+        Op::Block(BlockType::Empty),
+            // Loop for counting down
+            Op::Loop(BlockType::Empty),
+                // Check if count == 0
+                Op::LocalGet(0),
+                Op::I32Eqz,
+                Op::BrIf(1),  // break to outer block if count == 0
+                
+                // count = count - 1
+                Op::LocalGet(0),
+                Op::I32Const(1),
+                Op::I32Sub,
+                Op::LocalSet(0),
+                
+                // continue loop
+                Op::Br(0),
+            Op::End,
         Op::End,
-        Op::LocalGet(0),
+        
+        // return 0
+        Op::I32Const(0),
         Op::Return,
     ]);
+    
     let mut inst = rt().instantiate(&m).unwrap();
     assert_eq!(inst.call("countdown", &[Val::I32(10)]).unwrap(), Some(Val::I32(0)));
 }
@@ -504,6 +515,7 @@ fn host_callback_loop_100k() {
     let counter2 = counter.clone();
 
     let mut m = Module::new();
+    
     // host[0]: increment()
     m.register_host(
         "increment",
@@ -517,28 +529,42 @@ fn host_callback_loop_100k() {
     // Guest: loop ITERATIONS times, call host each time.
     //
     // locals[0] = i (counter, starts at ITERATIONS counts down to 0)
-    m.functions.push(Function::new("run", FuncType {params: vec![], results: vec![]}, vec![ValType::I32], vec![
+    m.functions.push(Function::new(
+        "run",
+        FuncType { params: vec![], results: vec![] },
+        vec![ValType::I32], // local 0 = counter
+        vec![
             // i = ITERATIONS
             Op::I32Const(ITERATIONS),
             Op::LocalSet(0),
-            // loop {
-            Op::Loop(BlockType::Empty),
-                // if i == 0 break
-                Op::LocalGet(0),
-                Op::I32Eqz,
-                Op::BrIf(0),
-                // call host
-                Op::CallHost(0),
-                // i -= 1
-                Op::LocalGet(0),
-                Op::I32Const(1),
-                Op::I32Sub,
-                Op::LocalSet(0),
-                // continue
-                Op::Br(0),
+            
+            // Outer block for breaking out of the loop
+            Op::Block(BlockType::Empty),
+                // Inner loop
+                Op::Loop(BlockType::Empty),
+                    // if i == 0 break to outer block
+                    Op::LocalGet(0),
+                    Op::I32Eqz,
+                    Op::BrIf(1),  // break to outer block (depth 1)
+                    
+                    // call host
+                    Op::CallHost(0),
+                    
+                    // i -= 1
+                    Op::LocalGet(0),
+                    Op::I32Const(1),
+                    Op::I32Sub,
+                    Op::LocalSet(0),
+                    
+                    // continue loop
+                    Op::Br(0),
+                Op::End,
             Op::End,
+            
             Op::Return,
-        ]));
+        ]
+    ));
+    
     m.exports.push(("run".into(), 0));
 
     let mut inst = rt().instantiate(&m).unwrap();
