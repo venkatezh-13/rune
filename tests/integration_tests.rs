@@ -316,7 +316,7 @@ fn test_loop_countdown() {
         Op::Loop(BlockType::Empty),
             Op::LocalGet(0),
             Op::I32Eqz,
-            Op::BrIf(1),         // exit loop when count == 0
+            Op::BrIf(0),         // exit loop when count == 0
             Op::LocalGet(0),
             Op::I32Const(1),
             Op::I32Sub,
@@ -526,7 +526,7 @@ fn host_callback_loop_100k() {
                 // if i == 0 break
                 Op::LocalGet(0),
                 Op::I32Eqz,
-                Op::BrIf(1),
+                Op::BrIf(0),
                 // call host
                 Op::CallHost(0),
                 // i -= 1
