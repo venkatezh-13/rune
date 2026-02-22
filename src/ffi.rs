@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 //! C API (FFI) implementation — corresponds to rune.h.
 //!
 //! This module exposes a stable C ABI so Rune can be embedded from C, Python,
