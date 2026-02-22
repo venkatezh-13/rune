@@ -5,7 +5,12 @@ members = [".", "runec"]
 name = "rune"
 version = "0.1.0"
 edition = "2021"
-description = "Low-latency AOT-first plugin runtime"
+description = "Low-latency embeddable plugin runtime with C ABI"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/venkatezh-13/rune"
+keywords = ["plugin", "runtime", "wasm", "interpreter", "embedding"]
+categories = ["wasm", "embedded", "no-std"]
+readme = "README.md"
 
 [lib]
 name = "rune"
@@ -14,6 +19,11 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "interpreter_bench"
+harness = false
 
 [profile.release]
 opt-level = 3
