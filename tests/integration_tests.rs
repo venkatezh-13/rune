@@ -31,7 +31,7 @@ fn single_func(name: &str, params: &[ValType], result: Option<ValType>, body: Ve
             results: result.into_iter().collect(),
         },
         vec![],
-        body,body.into(),
+        body.into(),
     ));
     m.exports.push((name.into(), 0));
     m
