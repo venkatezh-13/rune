@@ -6,15 +6,12 @@
 //! use rune::{Module, Runtime, types::{FuncType, Val, ValType}, ir::{Function, Op}};
 //!
 //! let mut module = Module::new();
-//! module.functions.push(Function {
-//!     name: "add".into(),
-//!     ty: FuncType {
-//!         params: vec![ValType::I32, ValType::I32],
-//!         results: vec![ValType::I32],
-//!     },
-//!     locals: vec![],
-//!     body: vec![Op::LocalGet(0), Op::LocalGet(1), Op::I32Add, Op::Return],
-//! });
+//! module.functions.push(Function::new(
+//!     "add",
+//!     FuncType { params: vec![ValType::I32, ValType::I32], results: vec![ValType::I32] },
+//!     vec![],
+//!     vec![Op::LocalGet(0), Op::LocalGet(1), Op::I32Add, Op::Return],
+//! ));
 //! module.exports.push(("add".into(), 0));
 //!
 //! let rt = Runtime::new();

@@ -4,6 +4,7 @@
 //! and verifies the output. This exercises the full pipeline:
 //!   Module builder → Module::to_bytes → Module::from_bytes → Instance::call
 
+use std::sync::Arc;
 use rune::{
     ir::{BlockType, Function, Op},
     module::Module,
@@ -14,7 +15,7 @@ use rune::{
 
 // Helper: build a Function using the new Arc-body API from a raw Vec<Op>
 fn func(name: &str, params: Vec<ValType>, results: Vec<ValType>, locals: Vec<ValType>, body: Vec<Op>) -> Function {
-    Function::new(name, FuncType { params, results }, locals, body.into())
+    Function::new(name, FuncType { params, results }, locals, body)
 }
 
 fn rt() -> Runtime { Runtime::new() }
@@ -30,7 +31,7 @@ fn single_func(name: &str, params: &[ValType], result: Option<ValType>, body: Ve
             results: result.into_iter().collect(),
         },
         vec![],
-        body.into(),
+        body,
     ));
     m.exports.push((name.into(), 0));
     m
@@ -309,34 +310,28 @@ fn test_block_br() {
 
 #[test]
 fn test_loop_countdown() {
-    // count down from N to 0 using a loop, return 0
-    // locals: [count (param)]
+    // count down from N to 0 using a loop, return 0.
+    //
+    // Br(0) = continue loop (targets the Loop frame itself)
+    // Br(1) = break out     (targets the wrapping Block, exits past its End)
+    // A bare Loop with no enclosing Block cannot be exited with Br(1) —
+    // the Block wrapper is required so depth-1 has a valid target.
     let m = single_func("countdown", &[ValType::I32], Some(ValType::I32), vec![
-        // Outer block for breaking out when count reaches 0
-        Op::Block(BlockType::Empty),
-            // Loop for counting down
-            Op::Loop(BlockType::Empty),
-                // Check if count == 0
+        Op::Block(BlockType::Empty),    // depth 1 — break target
+            Op::Loop(BlockType::Empty), // depth 0 — continue target
                 Op::LocalGet(0),
                 Op::I32Eqz,
-                Op::BrIf(1),  // break to outer block if count == 0
-                
-                // count = count - 1
+                Op::BrIf(1),           // if i==0: exit Block
                 Op::LocalGet(0),
                 Op::I32Const(1),
                 Op::I32Sub,
                 Op::LocalSet(0),
-                
-                // continue loop
-                Op::Br(0),
-            Op::End,
-        Op::End,
-        
-        // return 0
-        Op::I32Const(0),
+                Op::Br(0),             // continue Loop
+            Op::End,                   // End Loop
+        Op::End,                       // End Block
+        Op::LocalGet(0),
         Op::Return,
     ]);
-    
     let mut inst = rt().instantiate(&m).unwrap();
     assert_eq!(inst.call("countdown", &[Val::I32(10)]).unwrap(), Some(Val::I32(0)));
 }
@@ -515,7 +510,6 @@ fn host_callback_loop_100k() {
     let counter2 = counter.clone();
 
     let mut m = Module::new();
-    
     // host[0]: increment()
     m.register_host(
         "increment",
@@ -529,42 +523,31 @@ fn host_callback_loop_100k() {
     // Guest: loop ITERATIONS times, call host each time.
     //
     // locals[0] = i (counter, starts at ITERATIONS counts down to 0)
-    m.functions.push(Function::new(
-        "run",
-        FuncType { params: vec![], results: vec![] },
-        vec![ValType::I32], // local 0 = counter
-        vec![
+    m.functions.push(Function::new("run", FuncType {params: vec![], results: vec![]}, vec![ValType::I32], vec![
             // i = ITERATIONS
             Op::I32Const(ITERATIONS),
             Op::LocalSet(0),
-            
-            // Outer block for breaking out of the loop
-            Op::Block(BlockType::Empty),
-                // Inner loop
-                Op::Loop(BlockType::Empty),
-                    // if i == 0 break to outer block
+            // Block wraps the Loop so BrIf(1) has a valid exit target.
+            // Br(0) = continue Loop, Br(1) = break out of Block.
+            Op::Block(BlockType::Empty),    // depth 1 — break target
+                Op::Loop(BlockType::Empty), // depth 0 — continue target
+                    // if i == 0: exit Block
                     Op::LocalGet(0),
                     Op::I32Eqz,
-                    Op::BrIf(1),  // break to outer block (depth 1)
-                    
+                    Op::BrIf(1),
                     // call host
                     Op::CallHost(0),
-                    
                     // i -= 1
                     Op::LocalGet(0),
                     Op::I32Const(1),
                     Op::I32Sub,
                     Op::LocalSet(0),
-                    
-                    // continue loop
+                    // continue Loop
                     Op::Br(0),
-                Op::End,
-            Op::End,
-            
+                Op::End, // End Loop
+            Op::End, // End Block
             Op::Return,
-        ]
-    ));
-    
+        ]));
     m.exports.push(("run".into(), 0));
 
     let mut inst = rt().instantiate(&m).unwrap();
