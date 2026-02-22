@@ -1,14 +1,13 @@
 #![allow(clippy::type_complexity)]
-// Add this near the top of the file
-pub type HostFunc = Box<dyn Fn(&[Val]) -> Result<Option<Val>> + Send + Sync>;
 
-// Then change line 18 to:
-pub func: HostFunc,
+//! Module format and serialization.
+
 use crate::{
     ir::Function,
     trap::{Result, Trap},
     types::{FuncType, Val, ValType},
 };
+use std::collections::HashMap;
 
 /// Magic bytes at the start of every .rune file.
 pub const MAGIC: [u8; 4] = *b"RUNE";
@@ -18,7 +17,7 @@ pub const VERSION: u32 = 0x0001;
 // ── Host function registry ───────────────────────────────────────────────────
 
 /// Signature and callback for a host-provided function.
-pub struct HostFunc {
+pub struct HostFuncDef {
     pub name: String,
     pub ty: FuncType,
     pub func: Box<dyn Fn(&[Val]) -> Result<Option<Val>> + Send + Sync>,
@@ -39,7 +38,7 @@ pub struct Module {
     /// Maximum page count (None = unlimited).
     pub max_memory_pages: Option<usize>,
     /// Host functions registered by the embedder.
-    pub host_funcs: Vec<HostFunc>,
+    pub host_funcs: Vec<HostFuncDef>,
 }
 
 impl Module {
@@ -60,7 +59,7 @@ impl Module {
     where
         F: Fn(&[Val]) -> Result<Option<Val>> + Send + Sync + 'static,
     {
-        self.host_funcs.push(HostFunc {
+        self.host_funcs.push(HostFuncDef {
             name: name.into(),
             ty,
             func: Box::new(func),
