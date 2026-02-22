@@ -10,7 +10,7 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
