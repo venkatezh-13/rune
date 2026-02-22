@@ -1,21 +1,63 @@
-[workspace]
-members = [".", "runec"]
+name: CI
 
-[package]
-name = "rune"
-version = "0.1.0"
-edition = "2021"
-description = "Low-latency AOT-first plugin runtime"
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-[lib]
-name = "rune"
-crate-type = ["cdylib", "rlib"]
+env:
+  CARGO_TERM_COLOR: always
 
-[dependencies]
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable]
 
-[dev-dependencies]
+    steps:
+      - uses: actions/checkout@v4
 
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
+      - name: Install Rust ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --all
+
+      - name: Run tests
+        run: cargo test --all -- --nocapture
+
+      - name: Clippy
+        run: cargo clippy --all -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+  bench:
+    name: Benchmarks (informational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run benchmarks
+        run: cargo bench --bench interpreter_bench 2>&1 | tee bench_output.txt
+      - name: Upload bench results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench_output.txt
