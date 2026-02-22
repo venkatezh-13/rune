@@ -15,7 +15,7 @@ use rune::{
 
 // Helper: build a Function using the new Arc-body API from a raw Vec<Op>
 fn func(name: &str, params: Vec<ValType>, results: Vec<ValType>, locals: Vec<ValType>, body: Vec<Op>) -> Function {
-    Function::new(name, FuncType { params, results }, locals, body)
+    Function::new(name, FuncType { params, results }, locals, body.into())
 }
 
 fn rt() -> Runtime { Runtime::new() }
@@ -31,7 +31,7 @@ fn single_func(name: &str, params: &[ValType], result: Option<ValType>, body: Ve
             results: result.into_iter().collect(),
         },
         vec![],
-        body,
+        body,body.into(),
     ));
     m.exports.push((name.into(), 0));
     m
