@@ -313,7 +313,7 @@ fn test_loop_countdown() {
     // count down from N to 0 using a loop, return 0
     // locals: [count (param)]
     let m = single_func("countdown", &[ValType::I32], Some(ValType::I32), vec![
-        Op::Loop(BlockType::Val(ValType::I32)),
+        Op::Loop(BlockType::Empty),
             Op::LocalGet(0),
             Op::I32Eqz,
             Op::BrIf(1),         // exit loop when count == 0
