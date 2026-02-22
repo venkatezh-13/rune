@@ -75,7 +75,7 @@ fn prepare_func(func: &crate::ir::Function) -> PreparedFunc {
     }
 
     PreparedFunc {
-        ops:          Arc::new(ops),
+        ops: ops,
         ends:         Arc::new(ends),
         elses:        Arc::new(elses),
         n_params:     func.ty.params.len(),
